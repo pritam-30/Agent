@@ -1,0 +1,19 @@
+# Secrets — non-negotiable, especially after that key was shared earlier
+.env
+
+# Python bytecode — matches __pycache__ at every depth (top-level, knowlegdeBase/, operations/)
+__pycache__/
+*.pyc
+
+# Virtual environment — large, platform-specific, fully reproducible from requirements.txt
+rag_env/
+
+# Vector database — regenerate via buildDB.py, don't version binary DB files
+chroma_db/
+
+# Editor settings — personal, not project config
+.vscode/
+
+# OS junk
+.DS_Store
+Thumbs.db
