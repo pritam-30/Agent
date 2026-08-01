@@ -8,7 +8,7 @@ from knowlegdeBase.collection import add_document
 # Configuration
 # =====================================================
 
-PDF_PATH = "ML_Bias_Variance_Interview_Guide.pdf"
+PDF_PATH = "XYZ.pdf"  # Path to the PDF file to be processed
 
 
 # =====================================================
