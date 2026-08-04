@@ -1,6 +1,8 @@
+from pprint import pprint
 from google.genai import types
-from utils import embedding_model
+from utils import embedding_model, notes
 from knowlegdeBase.collection import collection
+from datetime import datetime
 
 
 # ==========================
@@ -12,18 +14,30 @@ note_tool = types.Tool(
         types.FunctionDeclaration(
             name="save_note",
             description=(
-                "Save a note or reminder. "
-                "If the user does not provide enough information, "
-                "pass an empty string and let the function handle validation."
+                "Save a structured note."
+                " Create a concise title, detailed content, and relevant tags."
+                " Use tags only when they add meaningful organization."
             ),
             parameters={
                 "type": "OBJECT",
                 "properties": {
-                    "text": {
+                    "title": {
                         "type": "STRING",
-                        "description": "The note or reminder to save."
+                        "description": "A short title for the note."
+                    },
+                    "content": {
+                        "type": "STRING",
+                        "description": "The main content of the note."
+                    },
+                    "tags": {
+                        "type": "ARRAY",
+                        "items": {
+                            "type": "STRING"
+                        },
+                        "description": "Optional tags for organizing the note."
                     }
-                }
+                },
+                "required": ["title", "content"]
             }
         )
     ]
@@ -59,26 +73,35 @@ rag_tool = types.Tool(
 # Tool Implementations
 # ==========================
 
-notes = []
-
-
-def save_note(text: str):
+def save_note(title: str, content: str, tags: list[str] | None = None):
     """
-    Save a note or reminder.
+    Save a structured note.
+
+    Args:
+        title: Title of the note.
+        content: Main note content.
+        tags: Optional list of tags.
     """
 
-    if not text.strip():
+    if not content.strip():
         return {
             "success": False,
-            "error": "Missing text",
-            "message": "Please tell me what you want me to add."
+            "error": "Missing content",
+            "message": "Please tell me what you want me to save."
         }
 
-    notes.append(text)
+    note = {
+        "title": title.strip() if title else "Untitled",
+        "content": content.strip(),
+        "tags": tags or [],
+        "created_at": datetime.now().isoformat()
+    }
+
+    notes.append(note)
 
     return {
         "success": True,
-        "note": text
+        "note": note
     }
 
 
@@ -101,8 +124,18 @@ def retrieve_documents(query: str):
 
 
 # ==========================
+# Utility Functions
+# ==========================
+
+def show_notes():
+    print("\n========== Notes ==========")
+    pprint(notes)
+    print("===========================\n")
+
+# ==========================
 # Tool Registry
 # ==========================
+
 
 TOOLS = {
     "save_note": save_note,

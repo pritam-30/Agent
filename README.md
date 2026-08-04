@@ -1,110 +1,253 @@
 # Agentic RAG Assistant
 
-A lightweight CLI assistant that combines Gemini function-calling with a document retrieval pipeline backed by ChromaDB. The agent can answer directly, retrieve relevant information from indexed documents, or save notes/reminders depending on the user request.
+A lightweight command-line AI assistant that combines **Gemini function calling** with a **Retrieval-Augmented Generation (RAG)** pipeline powered by **ChromaDB**.
 
-This project is intentionally simple and explicit: there is no orchestration framework involved. The tool selection logic, agent loop, and conversation state handling are all implemented directly in Python.
+The assistant decides whether to answer directly, retrieve information from indexed documents, or save structured notes based on the user's request. It supports multi-tool execution, maintains conversation context during a session, and is built without any orchestration frameworks—all planning, tool execution, and conversation management are implemented directly in Python.
 
-## What it does
+---
 
-You can ask the assistant questions in plain English, and it will decide whether it needs to:
+# Features
 
-- answer directly from its own knowledge,
-- retrieve relevant content from your indexed documents, or
-- save a note/reminder for later.
+- 🤖 Agentic tool-calling using Gemini Function Calling
+- 📄 Retrieval-Augmented Generation (RAG) with ChromaDB
+- 🔍 Semantic document search using BAAI/bge-base-en-v1.5 embeddings
+- 📚 PDF ingestion, chunking, embedding generation, and indexing
+- 📝 Structured note creation (title, content, tags, timestamp)
+- 🔧 Multiple tool calls within a single planning step when appropriate
+- 💬 Multi-turn conversation state within a CLI session
+- ⏱ Optional latency profiling for planner, tools, and total request execution
+- 🧩 Pure Python implementation without LangChain agents or orchestration frameworks
 
-It can also call multiple tools in the same turn when needed. For example, a request like “check my docs and save a note about it” can trigger retrieval and note-saving in one round trip.
+---
 
-## How it works
+# What the Assistant Can Do
 
-1. The user sends a message.
-2. Gemini decides whether a tool is needed.
-3. If needed, the assistant calls one or more tools.
-4. The tool results are appended back into the conversation history.
-5. The loop continues until the assistant can produce a final answer.
+The assistant accepts natural language requests and determines whether it should:
 
-## Project structure
+- answer directly using its own knowledge,
+- retrieve relevant information from indexed documents,
+- create and save structured notes,
+- or execute multiple independent tools within the same planning cycle.
+
+For example:
+
+- "What does my interview guide say about bagging vs boosting?"
+- "Summarize my documents and save the summary."
+- "Check my docs and save a note about them."
+
+---
+
+# Architecture
+
+The overall workflow is:
+
+```text
+User
+   │
+   ▼
+Gemini Planner
+   │
+   ├── No tool required
+   │       │
+   │       ▼
+   │   Final Answer
+   │
+   └── Tool(s) Required
+           │
+           ▼
+   Execute One or More Tools
+           │
+           ▼
+ Append Tool Results to Conversation
+           │
+           ▼
+ Gemini Planner
+           │
+           ├── More dependent tools required
+           │
+           └── Final Answer
+```
+
+Independent tools may be executed in a single planning step, while dependent tools are executed only after the required information becomes available.
+
+---
+
+# Project Structure
 
 ```text
 RAG/
-├── app.py                  # CLI loop and agent loop
-├── tools.py                # Tool schemas, implementations, and tool registry
-├── utils.py                # Shared utilities such as tokenizer and embedding model
-├── buildDB.py              # Build/rebuild the vector database
+├── app.py                  # CLI application and agent loop
+├── tools.py                # Tool schemas, implementations, and registry
+├── utils.py                # Shared utilities, embeddings, tokenizer, timers
+├── buildDB.py              # Builds the ChromaDB vector database
 ├── operations/
 │   ├── parser.py           # PDF parsing
-│   ├── chunker.py          # Chunking logic
+│   ├── chunker.py          # Document chunking
 │   └── embedding.py        # Embedding generation
-├── knowlegdeBase/
-│   └── collection.py       # ChromaDB collection setup and access
-├── chroma_db/              # Persisted vector store data
-├── .env                    # GEMINI_API_KEY (not committed)
+├── knowledgeBase/
+│   └── collection.py       # ChromaDB collection setup
+├── chroma_db/              # Persisted vector database
+├── .env                    # Environment variables (not committed)
 └── rag_env/                # Local virtual environment
 ```
 
-## Setup
+---
 
-1. Create and activate a virtual environment:
+# Setup
+
+## 1. Create a virtual environment
 
 ```bash
 python -m venv rag_env
+```
+
+Linux / macOS
+
+```bash
 source rag_env/bin/activate
 ```
 
-2. Install the required packages:
+Windows
+
+```bash
+rag_env\Scripts\activate
+```
+
+---
+
+## 2. Install dependencies
 
 ```bash
 pip install python-dotenv google-genai langchain-community langchain-text-splitters sentence-transformers transformers chromadb pymupdf
 ```
 
-3. Create a `.env` file in the project root with your Gemini API key:
+---
 
-```bash
-GEMINI_API_KEY=your-key-here
+## 3. Configure environment variables
+
+Create a `.env` file:
+
+```env
+GEMINI_API_KEY=your-api-key
+ENABLE_TIMING=False
 ```
 
-4. Place a PDF file in the project root (or update `PDF_PATH` in `buildDB.py`) and build the vector database:
+Set `ENABLE_TIMING=True` if you want to profile planner, tool, and total request latency.
+
+---
+
+## 4. Build the vector database
+
+Place your PDF(s) in the project (or update the path in `buildDB.py`) and run:
 
 ```bash
 python buildDB.py
 ```
 
-5. Run the assistant:
+---
+
+## 5. Run the assistant
 
 ```bash
 python app.py
 ```
 
-## Example
+---
+
+# Example
 
 ```text
 You: What does my guide say about bagging vs boosting?
-Assistant: According to your indexed document, bagging trains models in parallel and reduces variance, while boosting trains sequentially and focuses on correcting earlier mistakes.
 
-You: Save a note to review this before my interview.
-Assistant: Saved.
+Assistant:
+According to your indexed documents, bagging trains multiple models independently in parallel to reduce variance, while boosting trains models sequentially, allowing each model to correct errors made by previous ones.
+
+You: Summarize my documents and save the summary.
+
+Assistant:
+✓ Retrieved relevant documents
+✓ Generated a structured summary
+✓ Saved a structured note
+
+Title:
+ML Interview Guide Summary
 ```
 
-## Notes on implementation
+---
 
-The most important implementation details are straightforward but easy to get wrong:
+# Structured Notes
 
-- The conversation history must include both the model’s function-call turn and the corresponding tool responses.
-- Tool schemas and Python function signatures need to stay aligned so the model can call them correctly.
-- The loop should collect all function calls returned in a single turn rather than only the first one.
+Notes are stored as structured objects rather than plain text.
 
-## Limitations and roadmap
+Example:
 
-- The current setup is a local CLI only.
-- Retrieval is currently based on vector similarity and does not yet include hybrid search or reranking.
-- There is no automated evaluation harness yet.
-- Multi-turn memory within a single CLI session is still fairly simple.
+```json
+{
+  "title": "ML Interview Guide Summary",
+  "content": "Summary of the retrieved interview guide...",
+  "tags": ["ml", "interview", "summary"],
+  "created_at": "2026-08-04T15:40:21"
+}
+```
 
-## Next steps
+This structure makes future searching, filtering, and management significantly easier.
 
-Possible next steps include:
+---
 
-- adding an evaluation pipeline for retrieval and answer quality,
-- improving retrieval with hybrid search or reranking,
-- exposing the assistant through a web API, and
-- containerizing the app for easier deployment.
-# Agent
+# Latency Profiling
+
+Optional latency instrumentation is available for development and debugging.
+
+When enabled (`ENABLE_TIMING=True`), the assistant reports execution time for:
+
+- Planner (Gemini API)
+- Individual tool calls
+- Total end-to-end request latency
+
+Example:
+
+```text
+Planner: 1.32 s
+retrieve_documents: 2.11 s
+save_note: 0.00 s
+Planner: 1.47 s
+Total latency: 4.92 s
+```
+
+---
+
+# Implementation Notes
+
+Some important implementation details:
+
+- The complete conversation history includes both Gemini's function-call messages and the corresponding tool responses.
+- Tool schemas must remain synchronized with their Python function signatures.
+- Multiple tool calls returned within a single planner response are executed sequentially before returning control to Gemini.
+- The assistant avoids redundant retrieval when the required information already exists in the current conversation history.
+
+---
+
+# Current Limitations
+
+- CLI-only interface
+- Notes are currently stored in memory and are not persisted across sessions
+- Retrieval uses vector similarity only (no reranking or hybrid retrieval)
+- Conversation memory exists only for the current session
+- No automated evaluation pipeline yet
+
+---
+
+# Future Improvements
+
+Possible future enhancements include:
+
+- Persistent note storage (SQLite or another database)
+- Note retrieval, editing, and deletion
+- Hybrid retrieval and reranking
+- Retrieval quality evaluation
+- Streaming responses
+- REST API or web interface
+- Docker containerization
+- Long-term memory management for extended conversations
+
+---
