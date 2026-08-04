@@ -6,10 +6,8 @@ from time import perf_counter
 from contextlib import contextmanager
 load_dotenv()
 
-tokenizer = AutoTokenizer.from_pretrained(
-    "sentence-transformers/all-MiniLM-L6-v2"
-)
 
+tokenizer = AutoTokenizer.from_pretrained("BAAI/bge-base-en-v1.5")
 embedding_model = SentenceTransformer("BAAI/bge-base-en-v1.5")
 
 # =========================
@@ -26,4 +24,4 @@ def timer(name):
     try:
         yield
     finally:
-        print(f"{name}: {perf_counter() - start:.3f} s")
+        print(f"{name}: {perf_counter() - start:.2f} s")

@@ -1,7 +1,7 @@
 from pprint import pprint
 from google.genai import types
 from utils import embedding_model, notes
-from knowlegdeBase.collection import collection
+from knowledgeBase.collection import collection
 from datetime import datetime
 
 
