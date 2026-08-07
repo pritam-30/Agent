@@ -9,7 +9,7 @@ from knowledgeBase.collection import add_document, delete_collection, get_collec
 # =====================================================
 
 # Path to the PDF file to be processed
-PDF_PATH = "_OceanofPDF.com_Hands-On_Machine_Learning_with_Scikit-Learn_Keras_and_Tensorflow_-_Aurelien_Geron.pdf"
+PDF_PATH = "XYZ_2023.pdf"
 
 
 # =====================================================

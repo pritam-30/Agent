@@ -22,9 +22,6 @@ chroma_db/
 # Local debugging / helper scripts
 debug_DB.py
 
-# Project sample PDF / local data
-_OceanofPDF.com_Hands-On_Machine_Learning_with_Scikit-Learn_Keras_and_Tensorflow_-_Aurelien_Geron.pdf
-
 # Editor settings — personal, not project config
 .vscode/
 

@@ -17,6 +17,6 @@ def load_pdf(pdf_path, start_page: int | None = None, end_page: int | None = Non
 
     for doc in documents:
         doc.page_content = doc.page_content.replace(
-            "OceanofPDF.com", "").strip()
+            "xyz.com or links", "").strip()
 
     return documents
