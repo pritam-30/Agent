@@ -11,6 +11,20 @@ rag_env/
 # Vector database — regenerate via buildDB.py, don't version binary DB files
 chroma_db/
 
+# DeepEval local cache + run artifacts
+.deepeval/
+.deepeval-cache.json
+.latest_run_full.json
+.latest_test_run.json
+.temp-deepeval-cache.json
+.temp_test_run_data.json
+
+# Local debugging / helper scripts
+debug_DB.py
+
+# Project sample PDF / local data
+_OceanofPDF.com_Hands-On_Machine_Learning_with_Scikit-Learn_Keras_and_Tensorflow_-_Aurelien_Geron.pdf
+
 # Editor settings — personal, not project config
 .vscode/
 

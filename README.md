@@ -1,8 +1,8 @@
 # Agentic RAG Assistant
 
-A lightweight command-line AI assistant that combines **Gemini function calling** with a **Retrieval-Augmented Generation (RAG)** pipeline powered by **ChromaDB**.
+A lightweight command-line AI assistant that combines **Gemini Function Calling** with a **Retrieval-Augmented Generation (RAG)** pipeline powered by **ChromaDB**.
 
-The assistant decides whether to answer directly, retrieve information from indexed documents, or save structured notes based on the user's request. It supports multi-tool execution, maintains conversation context during a session, and is built without any orchestration frameworks—all planning, tool execution, and conversation management are implemented directly in Python.
+The assistant decides whether to answer directly, retrieve information from indexed documents, or save structured notes based on the user's request. It supports multi-tool execution, maintains conversation context during a session, and is built without orchestration frameworks—all planning, tool execution, retrieval, and conversation management are implemented directly in Python.
 
 ---
 
@@ -10,13 +10,19 @@ The assistant decides whether to answer directly, retrieve information from inde
 
 - 🤖 Agentic tool-calling using Gemini Function Calling
 - 📄 Retrieval-Augmented Generation (RAG) with ChromaDB
-- 🔍 Semantic document search using BAAI/bge-base-en-v1.5 embeddings
-- 📚 PDF ingestion, chunking, embedding generation, and indexing
+- 🔍 Multiple retrieval strategies
+  - Dense Similarity Search
+  - Max Marginal Relevance (MMR)
+- 🔄 Configurable retrieval strategy through an environment variable
+- 🧠 Semantic search using **BAAI/bge-base-en-v1.5** embeddings
+- 📚 PDF parsing, chunking, embedding generation, and indexing
+- 🧹 Cleaned knowledge base by removing index and low-information pages before indexing
+- 📊 Optional automatic RAG evaluation using DeepEval
 - 📝 Structured note creation (title, content, tags, timestamp)
 - 🔧 Multiple tool calls within a single planning step when appropriate
-- 💬 Multi-turn conversation state within a CLI session
-- ⏱ Optional latency profiling for planner, tools, and total request execution
-- 🧩 Pure Python implementation without LangChain agents or orchestration frameworks
+- 💬 Multi-turn conversation state during a CLI session
+- ⏱ Optional latency profiling for planner, retrieval, and total request execution
+- 🧩 Pure Python implementation without LangChain Agents or orchestration frameworks
 
 ---
 
@@ -27,48 +33,95 @@ The assistant accepts natural language requests and determines whether it should
 - answer directly using its own knowledge,
 - retrieve relevant information from indexed documents,
 - create and save structured notes,
-- or execute multiple independent tools within the same planning cycle.
+- execute multiple independent tools within the same planning cycle.
 
 For example:
 
 - "What does my interview guide say about bagging vs boosting?"
 - "Summarize my documents and save the summary."
-- "Check my docs and save a note about them."
+- "Check my notes and save a reminder."
 
 ---
 
 # Architecture
 
-The overall workflow is:
-
 ```text
-User
-   │
-   ▼
-Gemini Planner
-   │
-   ├── No tool required
-   │       │
-   │       ▼
-   │   Final Answer
-   │
-   └── Tool(s) Required
-           │
-           ▼
-   Execute One or More Tools
-           │
-           ▼
- Append Tool Results to Conversation
-           │
-           ▼
- Gemini Planner
-           │
-           ├── More dependent tools required
-           │
-           └── Final Answer
+                     User
+                       │
+                       ▼
+                Gemini Planner
+                       │
+         ┌─────────────┴─────────────┐
+         │                           │
+         ▼                           ▼
+  No Tool Required            Tool(s) Required
+         │                           │
+         ▼                           ▼
+   Final Response          Execute Tool(s)
+                                     │
+                                     ▼
+                     Append Tool Results to Conversation
+                                     │
+                                     ▼
+                             Gemini Planner
+                                     │
+                        ┌────────────┴────────────┐
+                        │                         │
+                        ▼                         ▼
+               Additional Tool?            Final Answer
 ```
 
-Independent tools may be executed in a single planning step, while dependent tools are executed only after the required information becomes available.
+Independent tools may be executed within the same planning step, while dependent tools execute only after their required information becomes available.
+
+---
+
+# Retrieval Pipeline
+
+The retrieval layer is modular and designed so that new retrieval algorithms can be added without modifying the agent loop.
+
+```text
+retrieve()
+      │
+      ├──────── Similarity Search
+      │
+      ├──────── MMR Search
+      │
+      └──────── Future Retrieval Methods
+```
+
+Current retrieval strategies include:
+
+## Dense Similarity Search
+
+- SentenceTransformer embeddings
+- Normalized embeddings
+- ChromaDB vector similarity
+- Fast baseline retrieval
+
+## Max Marginal Relevance (MMR)
+
+- Uses the same ChromaDB collection
+- Implemented using LangChain's Chroma wrapper
+- Retrieves more diverse yet relevant chunks
+- Reduces redundant context
+- Configurable using:
+  - `k`
+  - `fetch_k`
+  - `lambda_mult`
+
+The retrieval strategy is selected using:
+
+```env
+RETRIEVAL_METHOD=similarity
+```
+
+or
+
+```env
+RETRIEVAL_METHOD=mmr
+```
+
+No changes to the agent loop are required when switching retrieval methods.
 
 ---
 
@@ -76,19 +129,27 @@ Independent tools may be executed in a single planning step, while dependent too
 
 ```text
 RAG/
-├── app.py                  # CLI application and agent loop
-├── tools.py                # Tool schemas, implementations, and registry
-├── utils.py                # Shared utilities, embeddings, tokenizer, timers
-├── buildDB.py              # Builds the ChromaDB vector database
+├── app.py                          # Agent loop and CLI
+├── tools.py                        # Tool schemas
+├── Eval.py                         # DeepEval integration
+├── buildDB.py                      # Build ChromaDB
+├── utils.py                        # Shared utilities
+│
+├── retrieval/
+│   ├── retrieve.py                 # Retrieval dispatcher
+│   └── retrieval_strategies.py     # Similarity & MMR retrieval
+│
 ├── operations/
-│   ├── parser.py           # PDF parsing
-│   ├── chunker.py          # Document chunking
-│   └── embedding.py        # Embedding generation
+│   ├── parser.py                   # PDF parsing
+│   ├── chunker.py                  # Chunk generation
+│   └── embedding.py                # Embedding generation
+│
 ├── knowledgeBase/
-│   └── collection.py       # ChromaDB collection setup
-├── chroma_db/              # Persisted vector database
-├── .env                    # Environment variables (not committed)
-└── rag_env/                # Local virtual environment
+│   └── collection.py               # ChromaDB collection
+│
+├── chroma_db/
+├── .env
+└── rag_env/
 ```
 
 ---
@@ -101,7 +162,7 @@ RAG/
 python -m venv rag_env
 ```
 
-Linux / macOS
+Linux/macOS
 
 ```bash
 source rag_env/bin/activate
@@ -118,35 +179,79 @@ rag_env\Scripts\activate
 ## 2. Install dependencies
 
 ```bash
-pip install python-dotenv google-genai langchain-community langchain-text-splitters sentence-transformers transformers chromadb pymupdf
+pip install python-dotenv google-genai sentence-transformers transformers chromadb pymupdf langchain-chroma langchain-huggingface deepeval
 ```
 
 ---
 
-## 3. Configure environment variables
+## 3. Configure Environment Variables
 
-Create a `.env` file:
+Create a `.env` file.
 
 ```env
-GEMINI_API_KEY=your-api-key
+GEMINI_API_KEY=your_api_key
+
 ENABLE_TIMING=False
+ENABLE_EVALUATION=False
+
+RETRIEVAL_METHOD=similarity
+# similarity | mmr
 ```
 
-Set `ENABLE_TIMING=True` if you want to profile planner, tool, and total request latency.
+Available retrieval methods
+
+- `similarity`
+- `mmr`
+
+Enable latency profiling by setting
+
+```env
+ENABLE_TIMING=True
+```
+
+Enable automatic evaluation by setting
+
+```env
+ENABLE_EVALUATION=True
+```
 
 ---
 
-## 4. Build the vector database
+## 4. Prepare the Knowledge Base
 
-Place your PDF(s) in the project (or update the path in `buildDB.py`) and run:
+Place your PDF(s) inside the project and run
 
 ```bash
 python buildDB.py
 ```
 
+### Knowledge Base Preparation
+
+Before rebuilding the vector database, the source documents were cleaned to improve retrieval quality.
+
+The preprocessing removes low-information pages such as:
+
+- Index pages
+- Reference pages
+- Other noisy sections
+
+This reduced the knowledge base from approximately
+
+```
+1381 chunks
+```
+
+to roughly
+
+```
+1229 chunks
+```
+
+which significantly reduced retrieval noise and improved grounding quality.
+
 ---
 
-## 5. Run the assistant
+## 5. Run the Assistant
 
 ```bash
 python app.py
@@ -157,17 +262,27 @@ python app.py
 # Example
 
 ```text
-You: What does my guide say about bagging vs boosting?
+You:
+What does my interview guide say about bagging vs boosting?
 
 Assistant:
-According to your indexed documents, bagging trains multiple models independently in parallel to reduce variance, while boosting trains models sequentially, allowing each model to correct errors made by previous ones.
 
-You: Summarize my documents and save the summary.
+According to your indexed documents...
+
+Bagging trains multiple models independently to reduce variance, while boosting trains models sequentially so that each model learns from the mistakes of the previous one.
+```
+
+---
+
+```text
+You:
+Summarize my documents and save the summary.
 
 Assistant:
+
 ✓ Retrieved relevant documents
-✓ Generated a structured summary
-✓ Saved a structured note
+✓ Generated summary
+✓ Saved structured note
 
 Title:
 ML Interview Guide Summary
@@ -177,77 +292,124 @@ ML Interview Guide Summary
 
 # Structured Notes
 
-Notes are stored as structured objects rather than plain text.
+Notes are stored as structured objects.
 
-Example:
+Example
 
 ```json
 {
   "title": "ML Interview Guide Summary",
-  "content": "Summary of the retrieved interview guide...",
-  "tags": ["ml", "interview", "summary"],
+  "content": "...",
+  "tags": ["ml", "summary"],
   "created_at": "2026-08-04T15:40:21"
 }
 ```
 
-This structure makes future searching, filtering, and management significantly easier.
+This makes future searching, filtering, editing, and persistence significantly easier.
+
+---
+
+# Automatic Evaluation
+
+The assistant supports optional automatic evaluation of RAG responses using **DeepEval**.
+
+Current metrics include
+
+- Faithfulness
+- Answer Relevancy
+
+Evaluation runs automatically after retrieval and final response generation.
+
+It can be enabled with
+
+```env
+ENABLE_EVALUATION=True
+```
+
+Evaluation failures never interrupt the assistant and are reported only for debugging purposes.
 
 ---
 
 # Latency Profiling
 
-Optional latency instrumentation is available for development and debugging.
+Optional latency instrumentation is available.
 
-When enabled (`ENABLE_TIMING=True`), the assistant reports execution time for:
+When enabled (`ENABLE_TIMING=True`) the assistant reports
 
-- Planner (Gemini API)
-- Individual tool calls
-- Total end-to-end request latency
+- Planner latency
+- Retrieval latency
+- Individual tool latency
+- Total request latency
 
-Example:
+Example
 
 ```text
-Planner: 1.32 s
-retrieve_documents: 2.11 s
-save_note: 0.00 s
-Planner: 1.47 s
-Total latency: 4.92 s
+Planner: 1.42 s
+retrieve_documents: 2.08 s
+Planner: 1.31 s
+
+Total latency: 4.87 s
 ```
 
 ---
 
 # Implementation Notes
 
-Some important implementation details:
+Some important implementation details
 
-- The complete conversation history includes both Gemini's function-call messages and the corresponding tool responses.
-- Tool schemas must remain synchronized with their Python function signatures.
-- Multiple tool calls returned within a single planner response are executed sequentially before returning control to Gemini.
-- The assistant avoids redundant retrieval when the required information already exists in the current conversation history.
+- Gemini function calls and tool responses are both preserved inside the conversation history.
+- Tool schemas remain synchronized with their Python implementations.
+- Multiple independent tool calls are executed within a single planning iteration.
+- Retrieval strategies are isolated behind a dispatcher, making experimentation simple.
+- Embedding normalization is applied consistently during indexing and querying.
+- Retrieved document content is treated as the primary source of truth whenever retrieval occurs.
+- Previous tool outputs are reused whenever possible to avoid unnecessary retrieval.
+- Automatic evaluation runs only after successful retrieval and response generation.
 
 ---
 
 # Current Limitations
 
 - CLI-only interface
-- Notes are currently stored in memory and are not persisted across sessions
-- Retrieval uses vector similarity only (no reranking or hybrid retrieval)
-- Conversation memory exists only for the current session
-- No automated evaluation pipeline yet
+- Notes are stored only in memory
+- Conversation memory exists only during the current session
+- Retrieval currently supports dense similarity search and MMR only
+- No hybrid retrieval
+- No reranking
+- DeepEval currently measures Faithfulness and Answer Relevancy only
+- Automatic evaluation depends on external LLM calls and API limits
 
 ---
 
 # Future Improvements
 
-Possible future enhancements include:
+Potential future enhancements include
 
-- Persistent note storage (SQLite or another database)
+- Hybrid Retrieval (BM25 + Vector Search)
+- Cross-Encoder Reranking
+- Query Rewriting
+- Query Expansion
+- Hierarchical Document Summarization
+- Additional DeepEval metrics
+- Persistent note storage (SQLite/PostgreSQL)
 - Note retrieval, editing, and deletion
-- Hybrid retrieval and reranking
-- Retrieval quality evaluation
 - Streaming responses
-- REST API or web interface
-- Docker containerization
-- Long-term memory management for extended conversations
+- REST API
+- Web interface
+- Docker support
+- Long-term conversational memory
+
+---
+
+# Tech Stack
+
+- Python
+- Google Gemini
+- ChromaDB
+- Sentence Transformers
+- BAAI/bge-base-en-v1.5
+- LangChain (retrieval utilities only)
+- DeepEval
+- PyMuPDF
 
 ---

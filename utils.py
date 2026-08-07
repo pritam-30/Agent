@@ -25,3 +25,13 @@ def timer(name):
         yield
     finally:
         print(f"{name}: {perf_counter() - start:.2f} s")
+
+# ==========================
+# Utility Functions
+# ==========================
+
+
+def show_notes():
+    print("\n========== Notes ==========")
+    pprint(notes)
+    print("===========================\n")

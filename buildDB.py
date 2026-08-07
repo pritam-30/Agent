@@ -1,14 +1,15 @@
 from operations.parser import load_pdf
 from operations.chunker import create_chunks
 from operations.embedding import create_embeddings
-from knowlegdeBase.collection import add_document
+from knowledgeBase.collection import add_document, delete_collection, get_collection
 
 
 # =====================================================
 # Configuration
 # =====================================================
 
-PDF_PATH = "XYZ.pdf"  # Path to the PDF file to be processed
+# Path to the PDF file to be processed
+PDF_PATH = "_OceanofPDF.com_Hands-On_Machine_Learning_with_Scikit-Learn_Keras_and_Tensorflow_-_Aurelien_Geron.pdf"
 
 
 # =====================================================
@@ -17,15 +18,23 @@ PDF_PATH = "XYZ.pdf"  # Path to the PDF file to be processed
 
 print("Loading PDF...")
 
-documents = load_pdf(PDF_PATH)
+documents = load_pdf(PDF_PATH, start_page=21, end_page=1003)
 
 print("Creating chunks...")
 
 chunks = create_chunks(documents)
+print(f"Total chunks after filtering: {len(chunks)}")
 
 print("Creating embeddings...")
 
 embeddings = create_embeddings(chunks)
+
+
+# Start fresh
+delete_collection()
+
+# Recreate collection
+get_collection()
 
 print("Adding documents to ChromaDB...")
 
