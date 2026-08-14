@@ -64,7 +64,7 @@ def save_result(query: str, results):
         for metric in results.test_results[0].metrics_data
     }
 
-    with open("eval_results.jsonl", "a") as f:
+    with open("eval_results.json", "a") as f:
         f.write(json.dumps({"query": query, **scores}) + "\n")
 
 
