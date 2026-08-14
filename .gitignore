@@ -28,3 +28,12 @@ debug_DB.py
 # OS junk
 .DS_Store
 Thumbs.db
+
+test.py
+eval_results.json
+# Large PDFs and datasets - keep data separate
+data/
+*.pdf
+
+# Optional: lock files
+requirements.txt.lock

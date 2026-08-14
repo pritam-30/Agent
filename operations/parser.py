@@ -1,4 +1,5 @@
 from langchain_community.document_loaders import PyMuPDFLoader
+import re
 
 
 def load_pdf(pdf_path, start_page: int | None = None, end_page: int | None = None):
@@ -16,7 +17,7 @@ def load_pdf(pdf_path, start_page: int | None = None, end_page: int | None = Non
         documents = documents[start:end]
 
     for doc in documents:
-        doc.page_content = doc.page_content.replace(
-            "xyz.com or links", "").strip()
+        doc.page_content = re.sub(
+            r'oceanofpdf\.com', '', doc.page_content, flags=re.IGNORECASE).strip()
 
     return documents

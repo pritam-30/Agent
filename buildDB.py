@@ -11,7 +11,6 @@ from knowledgeBase.collection import add_document, delete_collection, get_collec
 # Path to the PDF file to be processed
 PDF_PATH = "XYZ_2023.pdf"
 
-
 # =====================================================
 # Build Vector Database
 # =====================================================

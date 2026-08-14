@@ -2,7 +2,6 @@ import os
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
-from Eval import evaluate_rag
 from tools import rag_tool, note_tool
 from retrieval.retrieve import TOOLS
 from utils import timer, show_notes
@@ -57,10 +56,9 @@ Rules:
 
 13. When all required information has been gathered, provide a complete and helpful final answer.
 
-14. When calling retrieve_documents, preserve the user's intent, technical terms, names, acronyms, and important keywords. Do not over-rewrite or over-expand the search query unless necessary to resolve ambiguity.
+14. If retrieve_documents has been used, treat the retrieved document content as the primary source of truth. Base the answer on the retrieved content. If the retrieved information is insufficient, explicitly state that the documents do not contain enough information instead of filling gaps with your own knowledge.
 
-15. If retrieve_documents has been used, treat the retrieved document content as the primary source of truth. Base the answer on the retrieved content. If the retrieved information is insufficient, explicitly state that the documents do not contain enough information instead of filling gaps with your own knowledge.
-
+16. Do not repeatedly call retrieve_documents for the same user request. Use retrieval again only when the previous retrieved context is clearly insufficient and a materially different query is likely to retrieve missing information. Do not continue retrieving simply because the retrieved context is imperfect. After a maximum of two retrieval attempts, use the available context to answer or state that the requested information is not sufficiently covered by the documents.
 """
 
 
@@ -92,23 +90,15 @@ def planner(contents):
 
 MAX_ITERATIONS = 10
 
-contents = [
-    {
-        "role": "model",
-        "parts": [
-            {
-                "text": "Hello! I am your intelligent AI assistant. How can I help you today?"
-            }
-        ],
-    }
-]
 
-
-def run_agent(user_message: str):
+def run_agent(user_message: str, contents: list | None = None):
 
     retrieved_chunks = None
 
     with timer("Total latency"):
+        if contents is None:
+            contents = []
+
         contents.append(
             types.Content(
                 role="user",
@@ -152,17 +142,7 @@ def run_agent(user_message: str):
                     raise RuntimeError(
                         f"Gemini returned no usable text (finish_reason: {finish_reason})")
 
-                try:
-                    if ENABLE_EVALUATION and retrieved_chunks is not None:
-                        evaluate_rag(
-                            query=user_message,
-                            answer=final_answer,
-                            retrieved_chunks=retrieved_chunks,
-                        )
-                except Exception as e:
-                    print(f"Evaluation failed: {e}")
-
-                return final_answer
+                return final_answer, retrieved_chunks
 
             response_parts = []
 
@@ -176,10 +156,16 @@ def run_agent(user_message: str):
                 if tool is None:
                     raise ValueError(f"Unknown tool: {tool_name}")
 
+                # if tool_name == "retrieve_documents":
+                #     if retrieval_count >= MAX_RETRIEVALS:
+                #         print("Maximum retrieval attempts reached.")
+                #         break
+                #     retrieval_count += 1
+
                 with timer(tool_name):
                     result = tool(**args)
                 if tool_name == "retrieve_documents":
-                    retrieved_chunks = result
+                    retrieved_chunks = result[0]
                 print("\nTool Result:")
                 print(result)
 

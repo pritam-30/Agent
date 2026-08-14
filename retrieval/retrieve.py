@@ -5,6 +5,7 @@ from .retrieval_strategies import (
 )
 from utils import notes
 from datetime import datetime
+from .query_rewriter import rewrite_query
 
 RETRIEVAL_METHOD = os.getenv(
     "RETRIEVAL_METHOD",
@@ -21,18 +22,22 @@ def retrieve(
     """
 
     if RETRIEVAL_METHOD == "similarity":
-        documents, metadatas, _ = similarity_search(
+        query = rewrite_query(query)
+        print(f"Rewritten query: {query}")
+        documents, metadatas = similarity_search(
             query=query,
             k=k,
         )
-        return documents
+        return documents, metadatas
 
     elif RETRIEVAL_METHOD == "mmr":
+        query = rewrite_query(query)
+        print(f"Rewritten query: {query}")
         documents, metadatas = mmr_search(
             query=query,
             k=k,
         )
-        return documents
+        return documents, metadatas
 
     else:
         raise ValueError(

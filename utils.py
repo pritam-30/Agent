@@ -1,5 +1,6 @@
 import os
 from dotenv import load_dotenv
+import pprint
 from sentence_transformers import SentenceTransformer
 from transformers import AutoTokenizer
 from time import perf_counter
@@ -33,5 +34,5 @@ def timer(name):
 
 def show_notes():
     print("\n========== Notes ==========")
-    pprint(notes)
+    pprint.pprint(notes)
     print("===========================\n")

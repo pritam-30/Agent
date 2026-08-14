@@ -17,6 +17,8 @@ The assistant decides whether to answer directly, retrieve information from inde
 - 🧠 Semantic search using **BAAI/bge-base-en-v1.5** embeddings
 - 📚 PDF parsing, chunking, embedding generation, and indexing
 - 🧹 Cleaned knowledge base by removing index and low-information pages before indexing
+- ✏️ Query rewriting for retrieval-oriented search queries
+- 🎯 Cross-encoder reranking of retrieved candidates
 - 📊 Optional automatic RAG evaluation using DeepEval
 - 📝 Structured note creation (title, content, tags, timestamp)
 - 🔧 Multiple tool calls within a single planning step when appropriate
@@ -80,13 +82,26 @@ Independent tools may be executed within the same planning step, while dependent
 The retrieval layer is modular and designed so that new retrieval algorithms can be added without modifying the agent loop.
 
 ```text
-retrieve()
-      │
-      ├──────── Similarity Search
-      │
-      ├──────── MMR Search
-      │
-      └──────── Future Retrieval Methods
+User Query
+    │
+    ▼
+Query Rewriting
+    │
+    ▼
+Candidate Retrieval
+    │
+    ├── Dense Similarity Search
+    │
+    └── MMR Search
+    │
+    ▼
+Cross-Encoder Reranking
+    │
+    ▼
+Top-K Context
+    │
+    ▼
+Gemini Planner
 ```
 
 Current retrieval strategies include:
@@ -129,27 +144,36 @@ No changes to the agent loop are required when switching retrieval methods.
 
 ```text
 RAG/
-├── app.py                          # Agent loop and CLI
-├── tools.py                        # Tool schemas
-├── Eval.py                         # DeepEval integration
-├── buildDB.py                      # Build ChromaDB
-├── utils.py                        # Shared utilities
-│
-├── retrieval/
-│   ├── retrieve.py                 # Retrieval dispatcher
-│   └── retrieval_strategies.py     # Similarity & MMR retrieval
-│
-├── operations/
-│   ├── parser.py                   # PDF parsing
-│   ├── chunker.py                  # Chunk generation
-│   └── embedding.py                # Embedding generation
-│
-├── knowledgeBase/
-│   └── collection.py               # ChromaDB collection
-│
-├── chroma_db/
+├── .deepeval/
 ├── .env
-└── rag_env/
+├── .git/
+├── .gitignore
+├── .vscode/
+├── Eval.py
+├── README.md
+├── app.py
+├── buildDB.py
+├── chroma_db/
+│   ├── chroma.sqlite3
+│   └── 6e3e3cae-19ce-4fd7-90ef-195ad60a45b1/
+├── debug_DB.py
+├── eval_results.jsonl
+├── requirements.txt
+├── knowledgeBase/
+│   └── collection.py
+├── operations/
+│   ├── chunker.py
+│   ├── embedding.py
+│   └── parser.py
+├── retrieval/
+│   ├── query_rewriter.py
+│   ├── reranker.py
+│   ├── retrieval_strategies.py
+│   └── retrieve.py
+├── rag_env/            # virtual environment (ignored)
+├── test.py
+├── tools.py
+└── utils.py
 ```
 
 ---
@@ -274,22 +298,6 @@ Bagging trains multiple models independently to reduce variance, while boosting 
 
 ---
 
-```text
-You:
-Summarize my documents and save the summary.
-
-Assistant:
-
-✓ Retrieved relevant documents
-✓ Generated summary
-✓ Saved structured note
-
-Title:
-ML Interview Guide Summary
-```
-
----
-
 # Structured Notes
 
 Notes are stored as structured objects.
@@ -313,22 +321,31 @@ This makes future searching, filtering, editing, and persistence significantly e
 
 The assistant supports optional automatic evaluation of RAG responses using **DeepEval**.
 
-Current metrics include
+The RAG pipeline was evaluated using **DeepEval** on 23 question-answering
+test cases based on the indexed book.
+
+Metrics:
 
 - Faithfulness
 - Answer Relevancy
+- Correctness
+- Contextual Precision
 
-Evaluation runs automatically after retrieval and final response generation.
+## Evaluation Results
 
-It can be enabled with
+| Metric                   | Average Score |  Pass Rate |
+| ------------------------ | ------------: | ---------: |
+| **Faithfulness**         |     **0.993** | **100.0%** |
+| **Correctness**          |     **0.935** |  **91.3%** |
+| **Answer Relevancy**     |     **0.898** |  **82.6%** |
+| **Contextual Precision** |     **0.812** |  **78.3%** |
 
-```env
-ENABLE_EVALUATION=True
-```
+The evaluation threshold was **0.70**.
 
-Evaluation failures never interrupt the assistant and are reported only for debugging purposes.
+The evaluation helped identify two main areas for improvement:
 
----
+- **Contextual Precision:** closely related concepts can sometimes result in less precise retrieval rankings.
+- **Answer Relevancy:** the generation model can occasionally include additional information beyond the scope of a narrowly phrased question.
 
 # Latency Profiling
 
@@ -361,6 +378,9 @@ Some important implementation details
 - Tool schemas remain synchronized with their Python implementations.
 - Multiple independent tool calls are executed within a single planning iteration.
 - Retrieval strategies are isolated behind a dispatcher, making experimentation simple.
+- Query rewriting is performed before retrieval when appropriate.
+- MMR can be used to improve diversity among retrieved candidates.
+- Retrieved candidates can be reranked using a cross-encoder before being passed to the generation model.
 - Embedding normalization is applied consistently during indexing and querying.
 - Retrieved document content is treated as the primary source of truth whenever retrieval occurs.
 - Previous tool outputs are reused whenever possible to avoid unnecessary retrieval.
@@ -375,8 +395,6 @@ Some important implementation details
 - Conversation memory exists only during the current session
 - Retrieval currently supports dense similarity search and MMR only
 - No hybrid retrieval
-- No reranking
-- DeepEval currently measures Faithfulness and Answer Relevancy only
 - Automatic evaluation depends on external LLM calls and API limits
 
 ---
@@ -386,11 +404,7 @@ Some important implementation details
 Potential future enhancements include
 
 - Hybrid Retrieval (BM25 + Vector Search)
-- Cross-Encoder Reranking
-- Query Rewriting
-- Query Expansion
 - Hierarchical Document Summarization
-- Additional DeepEval metrics
 - Persistent note storage (SQLite/PostgreSQL)
 - Note retrieval, editing, and deletion
 - Streaming responses
@@ -408,6 +422,7 @@ Potential future enhancements include
 - ChromaDB
 - Sentence Transformers
 - BAAI/bge-base-en-v1.5
+- cross-encoder/ms-marco-MiniLM-L-6-v2
 - LangChain (retrieval utilities only)
 - DeepEval
 - PyMuPDF

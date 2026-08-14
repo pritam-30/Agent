@@ -1,6 +1,6 @@
 from knowledgeBase.collection import get_collection
 from utils import embedding_model
-
+from .reranker import rerank_documents
 from langchain_chroma import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
 
@@ -37,6 +37,7 @@ vectorstore = Chroma(
 def similarity_search(
     query: str,
     k: int = 3,
+    candidate_k: int = 15
 ):
     """
     Dense vector similarity search using ChromaDB.
@@ -49,7 +50,7 @@ def similarity_search(
 
     results = collection.query(
         query_embeddings=[query_embedding],
-        n_results=k,
+        n_results=candidate_k,
         include=[
             "documents",
             "metadatas",
@@ -61,7 +62,14 @@ def similarity_search(
     metadatas = results["metadatas"][0]
     distances = results["distances"][0]
 
-    return documents, metadatas, distances
+    documents, metadatas = rerank_documents(
+        query=query,
+        documents=documents,
+        metadatas=metadatas,
+        top_k=k,
+    )
+
+    return documents, metadatas
 
 
 # ============================================================
@@ -91,5 +99,12 @@ def mmr_search(
     for doc in docs:
         documents.append(doc.page_content)
         metadatas.append(doc.metadata)
+
+    documents, metadatas = rerank_documents(
+        query=query,
+        documents=documents,
+        metadatas=metadatas,
+        top_k=k,
+    )
 
     return documents, metadatas

@@ -60,7 +60,7 @@ rag_tool = types.Tool(
                             "Preserve important technical terms, names, acronyms, and keywords. "
                             "Do not add unnecessary words or assumptions."
                         )
-                    }
+                    },
                 },
                 "required": ["query"]
             }
