@@ -6,6 +6,7 @@ from .retrieval_strategies import (
 from utils import notes
 from datetime import datetime
 from .query_rewriter import rewrite_query
+from .retrieval_strategies import hybrid_search
 
 RETRIEVAL_METHOD = os.getenv(
     "RETRIEVAL_METHOD",
@@ -37,6 +38,12 @@ def retrieve(
             query=query,
             k=k,
         )
+        return documents, metadatas
+
+    elif RETRIEVAL_METHOD == "hybrid":
+        query = rewrite_query(query)
+        print(f"Rewritten query: {query}")
+        documents, metadatas = hybrid_search(query=query, k=k)
         return documents, metadatas
 
     else:
