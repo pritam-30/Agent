@@ -12,6 +12,7 @@ The assistant decides whether to answer directly, retrieve information from inde
 - 📄 Retrieval-Augmented Generation (RAG) with ChromaDB
 - 🔍 Multiple retrieval strategies
   - Dense Similarity Search
+  - Hybrid Search
   - Max Marginal Relevance (MMR)
 - 🔄 Configurable retrieval strategy through an environment variable
 - 🧠 Semantic search using **BAAI/bge-base-en-v1.5** embeddings
@@ -25,8 +26,6 @@ The assistant decides whether to answer directly, retrieve information from inde
 - 💬 Multi-turn conversation state during a CLI session
 - ⏱ Optional latency profiling for planner, retrieval, and total request execution
 - 🧩 Pure Python implementation without LangChain Agents or orchestration frameworks
-
----
 
 # What the Assistant Can Do
 
@@ -94,6 +93,9 @@ Candidate Retrieval
     │
     └── MMR Search
     │
+    ├── Hybrid Search
+    │
+    │
     ▼
 Cross-Encoder Reranking
     │
@@ -112,6 +114,13 @@ Current retrieval strategies include:
 - Normalized embeddings
 - ChromaDB vector similarity
 - Fast baseline retrieval
+
+## Hybrid
+
+- Combines dense vector similarity and BM25 lexical retrieval.
+- Uses Reciprocal Rank Fusion (RRF) to merge ranked lists from both methods.
+- Applies a cross-encoder reranker to produce the final Top-K context.
+- Configurable parameters: `k`, `candidate_k`, and `rrf_k`.
 
 ## Max Marginal Relevance (MMR)
 
@@ -134,6 +143,12 @@ or
 
 ```env
 RETRIEVAL_METHOD=mmr
+```
+
+or
+
+```env
+RETRIEVAL_METHOD=hybrid
 ```
 
 No changes to the agent loop are required when switching retrieval methods.
@@ -226,6 +241,7 @@ Available retrieval methods
 
 - `similarity`
 - `mmr`
+- `hybrid`
 
 Enable latency profiling by setting
 
@@ -393,8 +409,6 @@ Some important implementation details
 - CLI-only interface
 - Notes are stored only in memory
 - Conversation memory exists only during the current session
-- Retrieval currently supports dense similarity search and MMR only
-- No hybrid retrieval
 - Automatic evaluation depends on external LLM calls and API limits
 
 ---
@@ -403,7 +417,6 @@ Some important implementation details
 
 Potential future enhancements include
 
-- Hybrid Retrieval (BM25 + Vector Search)
 - Hierarchical Document Summarization
 - Persistent note storage (SQLite/PostgreSQL)
 - Note retrieval, editing, and deletion
