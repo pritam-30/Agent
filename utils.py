@@ -1,6 +1,5 @@
 import os
 from dotenv import load_dotenv
-import pprint
 from sentence_transformers import SentenceTransformer
 from transformers import AutoTokenizer
 from time import perf_counter
@@ -10,9 +9,6 @@ load_dotenv()
 
 tokenizer = AutoTokenizer.from_pretrained("BAAI/bge-base-en-v1.5")
 embedding_model = SentenceTransformer("BAAI/bge-base-en-v1.5")
-
-# =========================
-notes = []
 
 
 @contextmanager
@@ -27,12 +23,22 @@ def timer(name):
     finally:
         print(f"{name}: {perf_counter() - start:.2f} s")
 
-# ==========================
-# Utility Functions
-# ==========================
 
+PROMPT_V1 = """
+You are a question-answering assistant.
 
-def show_notes():
-    print("\n========== Notes ==========")
-    pprint.pprint(notes)
-    print("===========================\n")
+Answer the user's question using ONLY the provided context.
+
+If the context does not contain enough information to answer the
+question, say that the information is not available in the context.
+
+Do not invent or add information from your own knowledge.
+
+Context:
+{context}
+
+Question:
+{query}
+
+Answer:
+"""

@@ -3,8 +3,8 @@ from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 from tools import rag_tool, note_tool
-from retrieval.retrieve import TOOLS
-from utils import timer, show_notes
+from src.retriever import TOOLS
+from utils import timer
 load_dotenv()
 
 # =====================================================
@@ -20,7 +20,7 @@ ENABLE_EVALUATION = os.getenv("ENABLE_EVALUATION", "False").lower() == "true"
 # =====================================================
 # Planner Prompt
 # =====================================================
-
+# A testing prompt for the planner.
 PLANNER_PROMPT = """
 You are an intelligent AI assistant with access to external tools.
 
@@ -156,12 +156,6 @@ def run_agent(user_message: str, contents: list | None = None):
                 if tool is None:
                     raise ValueError(f"Unknown tool: {tool_name}")
 
-                # if tool_name == "retrieve_documents":
-                #     if retrieval_count >= MAX_RETRIEVALS:
-                #         print("Maximum retrieval attempts reached.")
-                #         break
-                #     retrieval_count += 1
-
                 with timer(tool_name):
                     result = tool(**args)
                 if tool_name == "retrieve_documents":
@@ -217,9 +211,6 @@ if __name__ == "__main__":
         if user_input.lower() in {"exit", "quit"}:
             print("Goodbye!")
             break
-        if user_input.lower() == "show notes":
-            show_notes()
-            continue
 
         answer = run_agent(user_input)
 

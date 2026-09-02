@@ -4,40 +4,6 @@ from google.genai import types
 # Tool Declarations
 # ==========================
 
-note_tool = types.Tool(
-    function_declarations=[
-        types.FunctionDeclaration(
-            name="save_note",
-            description=(
-                "Save a structured note."
-                " Create a concise title, detailed content, and relevant tags."
-                " Use tags only when they add meaningful organization."
-            ),
-            parameters={
-                "type": "OBJECT",
-                "properties": {
-                    "title": {
-                        "type": "STRING",
-                        "description": "A short title for the note."
-                    },
-                    "content": {
-                        "type": "STRING",
-                        "description": "The main content of the note."
-                    },
-                    "tags": {
-                        "type": "ARRAY",
-                        "items": {
-                            "type": "STRING"
-                        },
-                        "description": "Optional tags for organizing the note."
-                    }
-                },
-                "required": ["title", "content"]
-            }
-        )
-    ]
-)
-
 
 rag_tool = types.Tool(
     function_declarations=[

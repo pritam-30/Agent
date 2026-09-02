@@ -1,443 +1,495 @@
-# Agentic RAG Assistant
+# RAG Knowledge Base Assistant
 
-A lightweight command-line AI assistant that combines **Gemini Function Calling** with a **Retrieval-Augmented Generation (RAG)** pipeline powered by **ChromaDB**.
+This repository contains a local Retrieval-Augmented Generation (RAG) assistant for answering questions over a document knowledge base. The current implementation uses Gemini models for query rewriting and grounded answer generation, ChromaDB for vector storage, BM25 for lexical retrieval, and a cross-encoder reranker to improve the final context passed to the generator.
 
-The assistant decides whether to answer directly, retrieve information from indexed documents, or save structured notes based on the user's request. It supports multi-tool execution, maintains conversation context during a session, and is built without orchestration frameworks—all planning, tool execution, retrieval, and conversation management are implemented directly in Python.
-
----
-
-# Features
-
-- 🤖 Agentic tool-calling using Gemini Function Calling
-- 📄 Retrieval-Augmented Generation (RAG) with ChromaDB
-- 🔍 Multiple retrieval strategies
-  - Dense Similarity Search
-  - Hybrid Search
-  - Max Marginal Relevance (MMR)
-- 🔄 Configurable retrieval strategy through an environment variable
-- 🧠 Semantic search using **BAAI/bge-base-en-v1.5** embeddings
-- 📚 PDF parsing, chunking, embedding generation, and indexing
-- 🧹 Cleaned knowledge base by removing index and low-information pages before indexing
-- ✏️ Query rewriting for retrieval-oriented search queries
-- 🎯 Cross-encoder reranking of retrieved candidates
-- 📊 Optional automatic RAG evaluation using DeepEval
-- 📝 Structured note creation (title, content, tags, timestamp)
-- 🔧 Multiple tool calls within a single planning step when appropriate
-- 💬 Multi-turn conversation state during a CLI session
-- ⏱ Optional latency profiling for planner, retrieval, and total request execution
-- 🧩 Pure Python implementation without LangChain Agents or orchestration frameworks
-
-# What the Assistant Can Do
-
-The assistant accepts natural language requests and determines whether it should:
-
-- answer directly using its own knowledge,
-- retrieve relevant information from indexed documents,
-- create and save structured notes,
-- execute multiple independent tools within the same planning cycle.
-
-For example:
-
-- "What does my interview guide say about bagging vs boosting?"
-- "Summarize my documents and save the summary."
-- "Check my notes and save a reminder."
+The code is structured as a research / prototype pipeline rather than a production chat app. It includes a command-line agent loop, document ingestion utilities, retrieval strategies, and evaluation scripts for retrieval, generation, latency, and scope adherence.
 
 ---
 
-# Architecture
+## What this project does
+
+- Parses and chunks PDFs before indexing
+- Embeds chunks with a SentenceTransformer model
+- Stores them in a persistent ChromaDB collection
+- Rewrites user queries before retrieval
+- Retrieves relevant chunks with one of several strategies:
+  - `similarity`
+  - `mmr`
+  - `hybrid`
+- Reranks candidates with a cross-encoder
+- Grounds answers in retrieved context using Gemini
+- Evaluates retrieval quality and generation behavior with DeepEval
+- Measures retrieval latency, RAG-pipeline latency, LLM time-to-first-streamed-chunk (TTFT), and generation latency
+
+---
+
+## Current architecture
 
 ```text
-                     User
-                       │
-                       ▼
-                Gemini Planner
-                       │
-         ┌─────────────┴─────────────┐
-         │                           │
-         ▼                           ▼
-  No Tool Required            Tool(s) Required
-         │                           │
-         ▼                           ▼
-   Final Response          Execute Tool(s)
-                                     │
-                                     ▼
-                     Append Tool Results to Conversation
-                                     │
-                                     ▼
-                             Gemini Planner
-                                     │
-                        ┌────────────┴────────────┐
-                        │                         │
-                        ▼                         ▼
-               Additional Tool?            Final Answer
+User question
+     │
+     ▼
+app.py / planner loop
+     │
+     ├── retrieve_documents tool
+     │       │
+     │       ▼
+     │   src/retriever.py
+     │       │
+     │       ├── rewrite_query() -> src/query_rewriter.py
+     │       ├── similarity_search() / mmr_search() / hybrid_search()
+     │       └── rerank_documents() -> src/reranker.py
+     │
+     ▼
+src/generator.py
+     │
+     ▼
+Grounded answer from Gemini using retrieved context
 ```
 
-Independent tools may be executed within the same planning step, while dependent tools execute only after their required information becomes available.
+The active agent loop in `app.py` is a simple planner pattern. In the current codebase, the only tool exposed to the model is `retrieve_documents`.
 
 ---
 
-# Retrieval Pipeline
+## Retrieval pipeline
 
-The retrieval layer is modular and designed so that new retrieval algorithms can be added without modifying the agent loop.
+The retrieval layer is implemented in `src/retrieval_strategies.py` and `src/retriever.py`.
 
-```text
-User Query
-    │
-    ▼
-Query Rewriting
-    │
-    ▼
-Candidate Retrieval
-    │
-    ├── Dense Similarity Search
-    │
-    └── MMR Search
-    │
-    ├── Hybrid Search
-    │
-    │
-    ▼
-Cross-Encoder Reranking
-    │
-    ▼
-Top-K Context
-    │
-    ▼
-Gemini Planner
-```
+### Similarity search
 
-Current retrieval strategies include:
+- Uses the `BAAI/bge-base-en-v1.5` embedding model
+- Normalizes embeddings
+- Queries ChromaDB for nearest neighbors
+- Optionally reranks the retrieved candidates with the cross-encoder
 
-## Dense Similarity Search
+### MMR search
 
-- SentenceTransformer embeddings
-- Normalized embeddings
-- ChromaDB vector similarity
-- Fast baseline retrieval
+- Uses LangChain Chroma `max_marginal_relevance_search`
+- Balances relevance and diversity when selecting chunks
+- Then reranks the result set
 
-## Hybrid
+### Hybrid search
 
-- Combines dense vector similarity and BM25 lexical retrieval.
-- Uses Reciprocal Rank Fusion (RRF) to merge ranked lists from both methods.
-- Applies a cross-encoder reranker to produce the final Top-K context.
-- Configurable parameters: `k`, `candidate_k`, and `rrf_k`.
+Combines:
 
-## Max Marginal Relevance (MMR)
+- dense vector similarity
+- BM25 lexical retrieval
+- reciprocal rank fusion (RRF)
 
-- Uses the same ChromaDB collection
-- Implemented using LangChain's Chroma wrapper
-- Retrieves more diverse yet relevant chunks
-- Reduces redundant context
-- Configurable using:
-  - `k`
-  - `fetch_k`
-  - `lambda_mult`
+The fused candidates are then passed through the cross-encoder reranker.
 
-The retrieval strategy is selected using:
+The active strategy is selected by the `RETRIEVAL_METHOD` environment variable:
 
 ```env
 RETRIEVAL_METHOD=similarity
+
+# or:
+# RETRIEVAL_METHOD=mmr
+# RETRIEVAL_METHOD=hybrid
 ```
-
-or
-
-```env
-RETRIEVAL_METHOD=mmr
-```
-
-or
-
-```env
-RETRIEVAL_METHOD=hybrid
-```
-
-No changes to the agent loop are required when switching retrieval methods.
 
 ---
 
-# Project Structure
+## Project structure
 
 ```text
-RAG/
-├── .deepeval/
-├── .env
-├── .git/
-├── .gitignore
-├── .vscode/
-├── Eval.py
-├── README.md
+Rag/
 ├── app.py
-├── buildDB.py
-├── chroma_db/
-│   ├── chroma.sqlite3
-│   └── 6e3e3cae-19ce-4fd7-90ef-195ad60a45b1/
-├── debug_DB.py
-├── eval_results.jsonl
+├── README.md
 ├── requirements.txt
+├── tools.py
+├── utils.py
+|
+├── src/
+│   ├── generator.py
+│   ├── query_rewriter.py
+│   ├── reranker.py
+│   ├── retriever.py
+│   └── retrieval_strategies.py
+│
 ├── knowledgeBase/
 │   └── collection.py
+│
 ├── operations/
 │   ├── chunker.py
 │   ├── embedding.py
 │   └── parser.py
-├── retrieval/
-│   ├── query_rewriter.py
-│   ├── reranker.py
-│   ├── retrieval_strategies.py
-│   └── retrieve.py
-├── rag_env/            # virtual environment (ignored)
-├── test.py
-├── tools.py
-└── utils.py
+│
+├── evals/
+│   ├── eval_generator.py
+│   ├── eval_latency.py
+│   ├── eval_pipeline.py
+│   ├── eval_retriever.py
+│   ├── eval_scope.py
+│   └── eval_toxicity.py
+│
+├── results/
+│   ├── retriever_results.json
+│   ├── scope_results.json
+│   ├── toxicity_results.json
+│   ├── prompt_v1/
+│   │   ├── generator_results.json
+│   │   └── pipeline_results.json
+│   └── prompt_v2/
+│       └── pipeline_results.json
+|       ├── generator_results.json
+│
+├── test_cases/
+│   ├── generator_evalset.json
+│   ├── pipeline_eval.json
+│   ├── retriever_eval.py
+│   ├── scope_evalset.json
+│   └── toxicity_eval.json
+│
+├── vector_db/
+│   ├── buildDB.py
+│
+│
+└── chroma_db/
 ```
+
+The local virtual environment and `.env` file are not included in the repository tree because they contain environment-specific files and configuration.
 
 ---
 
-# Setup
+## Setup
 
-## 1. Create a virtual environment
+### 1. Create and activate a virtual environment
 
 ```bash
 python -m venv rag_env
-```
-
-Linux/macOS
-
-```bash
 source rag_env/bin/activate
 ```
 
-Windows
+On Windows PowerShell:
 
-```bash
-rag_env\Scripts\activate
+```powershell
+python -m venv rag_env
+.\rag_env\Scripts\Activate.ps1
 ```
 
----
-
-## 2. Install dependencies
+### 2. Install dependencies
 
 ```bash
-pip install python-dotenv google-genai sentence-transformers transformers chromadb pymupdf langchain-chroma langchain-huggingface deepeval
+pip install -r requirements.txt
 ```
 
----
+The dependency set is currently centered on:
 
-## 3. Configure Environment Variables
+- `google-genai`
+- `python-dotenv`
+- `chromadb`
+- `sentence-transformers`
+- `transformers`
+- `torch`
+- `pymupdf`
+- `langchain-chroma`
+- `langchain-huggingface`
+- `deepeval`
 
-Create a `.env` file.
+### 3. Configure environment variables
+
+Create a `.env` file in the project root:
 
 ```env
-GEMINI_API_KEY=your_api_key
-
+GEMINI_API_KEY=your_api_key_here
 ENABLE_TIMING=False
-ENABLE_EVALUATION=False
-
 RETRIEVAL_METHOD=similarity
-# similarity | mmr
 ```
 
-Available retrieval methods
+Notes:
 
-- `similarity`
-- `mmr`
-- `hybrid`
-
-Enable latency profiling by setting
-
-```env
-ENABLE_TIMING=True
-```
-
-Enable automatic evaluation by setting
-
-```env
-ENABLE_EVALUATION=True
-```
+- `GEMINI_API_KEY` is required for the query rewriter and generator.
+- `ENABLE_TIMING=True` enables the timing context manager in `utils.py`.
+- `RETRIEVAL_METHOD` must be one of:
+  - `similarity`
+  - `mmr`
+  - `hybrid`
 
 ---
 
-## 4. Prepare the Knowledge Base
+## Build the knowledge base
 
-Place your PDF(s) inside the project and run
+The project expects a PDF knowledge base to be indexed into ChromaDB. The indexing script is in `vector_db/buildDB.py`, and it currently sets a PDF path manually:
+
+```python
+PDF_PATH = "XYZ_2023.pdf"
+```
+
+Update that value to the actual file you want to index, then run:
 
 ```bash
-python buildDB.py
+python vector_db/buildDB.py
 ```
 
-### Knowledge Base Preparation
+This script:
 
-Before rebuilding the vector database, the source documents were cleaned to improve retrieval quality.
+1. loads the PDF
+2. trims front/back matter if configured
+3. splits the content into chunks
+4. removes very short or citation-heavy chunks
+5. creates embeddings
+6. resets the Chroma collection
+7. stores the chunks and metadata
 
-The preprocessing removes low-information pages such as:
+The document ingestion pipeline itself is defined in:
 
-- Index pages
-- Reference pages
-- Other noisy sections
-
-This reduced the knowledge base from approximately
-
-```
-1381 chunks
-```
-
-to roughly
-
-```
-1229 chunks
-```
-
-which significantly reduced retrieval noise and improved grounding quality.
+- `operations/parser.py`
+- `operations/chunker.py`
+- `operations/embedding.py`
+- `knowledgeBase/collection.py`
 
 ---
 
-## 5. Run the Assistant
+## Run the assistant
+
+Start the command-line app:
 
 ```bash
 python app.py
 ```
 
----
-
-# Example
+Example interaction:
 
 ```text
-You:
-What does my interview guide say about bagging vs boosting?
+You: What does the knowledge base say about online learning?
 
-Assistant:
-
-According to your indexed documents...
-
-Bagging trains multiple models independently to reduce variance, while boosting trains models sequentially so that each model learns from the mistakes of the previous one.
+Assistant: ...
 ```
+
+The current app loop:
+
+- appends the user message to the conversation history
+- sends it to Gemini with a system prompt and tool schema
+- calls `retrieve_documents` when the model decides retrieval is needed
+- appends tool results back into the conversation
+- continues until the model provides a final answer or a maximum iteration limit is reached
 
 ---
 
-# Structured Notes
+## Tooling and prompt behavior
 
-Notes are stored as structured objects.
+The runtime planner in `app.py` uses a Gemini model with a tool-calling prompt. The tool schema is declared in `tools.py` and currently includes:
 
-Example
+- `retrieve_documents(query: str)`
 
-```json
-{
-  "title": "ML Interview Guide Summary",
-  "content": "...",
-  "tags": ["ml", "summary"],
-  "created_at": "2026-08-04T15:40:21"
-}
-```
-
-This makes future searching, filtering, editing, and persistence significantly easier.
+This is the tool that triggers the retrieval stack.
 
 ---
 
-# Automatic Evaluation
+## Generator behavior
 
-The assistant supports optional automatic evaluation of RAG responses using **DeepEval**.
+The answer generation logic lives in `src/generator.py`.
 
-The RAG pipeline was evaluated using **DeepEval** on 23 question-answering
-test cases based on the indexed book.
+`generate_answer()`:
 
-Metrics:
+- joins the retrieved chunks into a context block
+- inserts them into a strict context-grounded prompt
+- calls Gemini with `temperature=0.0`
+- returns the textual answer
 
-- Faithfulness
-- Answer Relevancy
-- Correctness
-- Contextual Precision
+The prompt enforces a grounded-answer policy:
 
-## Evaluation Results
+- answer only from the provided context
+- do not invent missing facts
+- do not answer outside the knowledge-base scope
+- maintain a professional tone
 
-| Metric                   | Average Score |  Pass Rate |
-| ------------------------ | ------------: | ---------: |
-| **Faithfulness**         |     **0.993** | **100.0%** |
-| **Correctness**          |     **0.935** |  **91.3%** |
-| **Answer Relevancy**     |     **0.898** |  **82.6%** |
-| **Contextual Precision** |     **0.812** |  **78.3%** |
+---
+
+## Query rewriting
+
+Before retrieval, `src/retriever.py` calls `rewrite_query()` from `src/query_rewriter.py`.
+
+This step:
+
+- rewrites the original question into a retrieval-optimized query
+- keeps domain-specific terminology
+- removes unnecessary filler
+- tries to preserve the user's intent while improving search quality
+
+---
+
+## Evaluation suite
+
+This repository includes evaluation scripts under `evals/`:
+
+- `eval_retriever.py`: retrieval metrics using DeepEval
+- `eval_generator.py`: answer quality checks against ideal context
+- `eval_pipeline.py`: end-to-end RAG pipeline evaluation
+- `eval_scope.py`: scope adherence evaluation
+- `eval_toxicity.py`: toxicity evaluation
+- `eval_latency.py`: latency benchmarking
+
+The evaluation outputs are saved under `results/`.
+
+---
+
+## Baseline evaluation results
+
+The following results were obtained from the saved evaluation runs and represent baseline measurements for the current implementation.
 
 The evaluation threshold was **0.70**.
 
-The evaluation helped identify two main areas for improvement:
+### Retriever
 
-- **Contextual Precision:** closely related concepts can sometimes result in less precise retrieval rankings.
-- **Answer Relevancy:** the generation model can occasionally include additional information beyond the scope of a narrowly phrased question.
+- Contextual Precision: **0.664**
+- Contextual Recall: **0.892**
 
-# Latency Profiling
+### Safety
 
-Optional latency instrumentation is available.
+- Scope adherence: **0.910**
+- Toxicity: **0.000**
 
-When enabled (`ENABLE_TIMING=True`) the assistant reports
+### Generator — prompt_v1
 
-- Planner latency
-- Retrieval latency
-- Individual tool latency
-- Total request latency
+- Answer Relevancy: **0.983**
+- Faithfulness: **1.000**
 
-Example
+### RAG pipeline — prompt_v1
 
-```text
-Planner: 1.42 s
-retrieve_documents: 2.08 s
-Planner: 1.31 s
+- Answer Relevancy: **0.875**
+- Faithfulness: **1.000**
+- Correctness: **0.850**
+- Completeness: **0.765**
 
-Total latency: 4.87 s
+The baseline evaluation shows particularly strong faithfulness and toxicity results. The main weaknesses are retrieval precision and answer completeness on harder or more ambiguous questions.
+
+---
+
+## Latency Profiling
+
+The latency benchmark measures the RAG pipeline independently from the planner-level application loop.
+
+Run it with:
+
+```bash
+python -m evals.eval_latency
 ```
 
+### Baseline latency results
+
+Example benchmark results:
+
+```text
+LATENCY (milliseconds)
+
+| Run |  E2E P95 | Retrieval P95 | Generation P95 | TTFT P95 | Avg answer |
+| --- | -------: | ------------: | -------------: | -------: | ---------: |
+| 1   | 9,965 ms |      8,769 ms |       1,351 ms | 1,347 ms |  247 chars |
+| 2   | 8,358 ms |      6,850 ms |       1,529 ms | 1,364 ms |  604 chars |
+| 3   | 4,894 ms |      3,723 ms |       1,179 ms | 1,177 ms |   47 chars |
+| 4   | 4,777 ms |      3,711 ms |       1,102 ms | 1,021 ms |  461 chars |
+
+These values were obtained from a small initial benchmark and should be treated as baseline measurements rather than statistically robust latency estimates.
+```
+
+### Latency definitions
+
+- **Retrieval latency:** Time spent in the retrieval stage measured by the benchmarked retrieval function.
+- **TTFT:** Time from the start of the LLM generation request until the first non-empty streamed chunk is received.
+- **Generation latency:** Time from the start of the LLM generation request until the complete streamed response is received.
+- **RAG pipeline latency:** Time from the start of retrieval until the complete generated response is received.
+
+The benchmark's RAG pipeline latency does **not necessarily represent the complete user-request latency of the `app.py` planner loop**, because planner/model tool-selection latency can occur before retrieval.
+
+### Baseline SLOs
+
+The benchmark currently uses:
+
+- RAG pipeline P95 ≤ **3000 ms**
+- TTFT P95 ≤ **1200 ms**
+
+Based on the baseline results:
+
+```text
+RAG pipeline P95: ~4777 ms → FAIL
+TTFT P95:          ~1021 ms → PASS
+```
+
+The latest baseline indicates that retrieval is the primary latency bottleneck, accounting for approximately 3.7 seconds of the roughly 4.8-second RAG pipeline latency.
+
 ---
 
-# Implementation Notes
+## Notes
 
-Some important implementation details
-
-- Gemini function calls and tool responses are both preserved inside the conversation history.
-- Tool schemas remain synchronized with their Python implementations.
-- Multiple independent tool calls are executed within a single planning iteration.
-- Retrieval strategies are isolated behind a dispatcher, making experimentation simple.
-- Query rewriting is performed before retrieval when appropriate.
-- MMR can be used to improve diversity among retrieved candidates.
-- Retrieved candidates can be reranked using a cross-encoder before being passed to the generation model.
-- Embedding normalization is applied consistently during indexing and querying.
-- Retrieved document content is treated as the primary source of truth whenever retrieval occurs.
-- Previous tool outputs are reused whenever possible to avoid unnecessary retrieval.
-- Automatic evaluation runs only after successful retrieval and response generation.
+- This project is best treated as a local research prototype for document-grounded QA.
+- The data pipeline is designed around a single PDF-based knowledge source, but the retrieval architecture is modular enough to extend to additional sources.
+- Some older documentation may describe capabilities that are no longer implemented exactly; this README reflects the current implementation.
+- Evaluation scores and latency measurements are benchmark results for the current datasets/configuration and are not guarantees of production performance.
+- The latency benchmark measures the RAG retrieval-and-generation path separately from planner-level latency in the command-line application.
 
 ---
 
-# Current Limitations
+## Quick start
+
+```bash
+python -m venv rag_env
+source rag_env/bin/activate
+
+pip install -r requirements.txt
+
+# create a .env file with GEMINI_API_KEY and RETRIEVAL_METHOD
+
+python vector_db/buildDB.py
+python app.py
+```
+
+If you do not already have a `.env`, create one manually with the variables shown in the Setup section.
+
+---
+
+## Current status
+
+This repository is a working local RAG prototype for grounded document QA, with indexing, retrieval, generation, and evaluation code present in the current project.
+
+The current implementation includes:
+
+- PDF parsing and chunking
+- SentenceTransformer embeddings
+- persistent ChromaDB storage
+- query rewriting
+- dense, MMR, and hybrid retrieval strategies
+- BM25 lexical retrieval
+- reciprocal rank fusion
+- cross-encoder reranking
+- Gemini-based grounded generation
+- DeepEval-based evaluation
+- latency benchmarking
+- scope and toxicity evaluation
+
+---
+
+## Current Limitations
 
 - CLI-only interface
-- Notes are stored only in memory
 - Conversation memory exists only during the current session
-- Automatic evaluation depends on external LLM calls and API limits
+- The latency benchmark is based on a small number of runs and should be expanded for more reliable percentile estimates
+- Retrieval remains the primary latency bottleneck in the current baseline
 
 ---
 
-# Future Improvements
+## Future Improvements
 
-Potential future enhancements include
+Potential future enhancements include:
 
-- Hierarchical Document Summarization
-- Persistent note storage (SQLite/PostgreSQL)
-- Note retrieval, editing, and deletion
-- Streaming responses
 - REST API
 - Web interface
 - Docker support
 - Long-term conversational memory
+- Further retrieval and reranking latency optimization
 
 ---
 
-# Tech Stack
+## Tech Stack
 
 - Python
 - Google Gemini
 - ChromaDB
 - Sentence Transformers
-- BAAI/bge-base-en-v1.5
-- cross-encoder/ms-marco-MiniLM-L-6-v2
+- `BAAI/bge-base-en-v1.5`
+- `cross-encoder/ms-marco-MiniLM-L-6-v2`
+- BM25
 - LangChain (retrieval utilities only)
 - DeepEval
 - PyMuPDF
-
----

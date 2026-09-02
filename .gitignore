@@ -29,8 +29,12 @@ debug_DB.py
 .DS_Store
 Thumbs.db
 
-test.py
-eval_results.json
+
+app.py
+export_chunks.py
+all_chunks.json
+test_cases/
+results/
 # Large PDFs and datasets - keep data separate
 data/
 *.pdf
