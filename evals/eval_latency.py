@@ -10,14 +10,14 @@ from src.generator import generate_answer, generate_stream
 
 
 QUESTIONS = [
-    # "Why can machine learning automatically adapt when the patterns in spam change?",
-    # "How does online learning differ from batch learning when new data arrives?",
-    # "How does regularization affect the risk of overfitting?",
+    "Why can machine learning automatically adapt when the patterns in spam change?",
+    "How does online learning differ from batch learning when new data arrives?",
+    "How does regularization affect the risk of overfitting?",
     "What are the two main problems with hard-margin SVM classification, and how does soft-margin classification address them?",
 ]
 
 # measured runs PER question -> total samples = len(QUESTIONS) * REPEATS
-REPEATS = 4
+REPEATS = 3
 WARMUP_RUNS = 2       # throwaway calls before measuring (cold start)
 
 # stream generation and clock time-to-first-token (perceived latency)
@@ -37,7 +37,7 @@ SLO_TTFT_P95_MS = 1200   # perceived: first visible token p95 under 1.2s
 
 def run_end_to_end(question):
     docs, metadata = similarity_search(
-        query=question, candidate_k=15, k=5, rerank=True)
+        query=question, candidate_k=10, k=5, rerank=True)
     answer = generate_answer(query=question, context=docs)
     return answer
 
@@ -49,7 +49,7 @@ def run_end_to_end(question):
 def run_stages(question):
     t0 = time.perf_counter()
     docs, metadata = similarity_search(
-        query=question, candidate_k=15, k=5, rerank=True)
+        query=question, candidate_k=10, k=5, rerank=True)
     t1 = time.perf_counter()
     answer = generate_answer(query=question, context=docs)
     t2 = time.perf_counter()
@@ -66,7 +66,7 @@ def run_stages(question):
 def run_stages_streaming(question):
     t0 = time.perf_counter()
     docs, metadata = similarity_search(
-        query=question, candidate_k=15, k=5, rerank=True)
+        query=question, candidate_k=10, k=5, rerank=True)
     t1 = time.perf_counter()
 
     first_token_t = None

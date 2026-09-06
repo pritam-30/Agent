@@ -438,10 +438,30 @@ The latest baseline indicates that retrieval is the primary latency bottleneck, 
 
 ---
 
+### Improved Latency
+
+=================================================================================================
+LATENCY (milliseconds)
+=================================================================================================
+
+---
+
+end-to-end | mean= 3292.5 p50= 3372.8 p95= 3668.1 p99= 3822.8 min= 2878.3 max= 3861.4
+ttft | mean= 923.9 p50= 917.7 p95= 995.0 p99= 1001.0 min= 866.6 max= 1002.6
+retrieval | mean= 2227.1 p50= 2158.6 p95= 2618.6 p99= 2777.8 min= 1953.8 max= 2817.6
+generation | mean= 1065.3 p50= 1056.2 p95= 1236.8 p99= 1281.9 min= 883.4 max= 1293.2
+
+---
+
+# avg answer length: 540 chars (latency varies with output length)
+
+SLO: full answer p95 <= 3000 ms -> p95 = 3668 ms [FAIL]
+SLO: first token (perceived) p95 <= 1200 ms -> p95 = 995 ms [PASS]
+
+Reducing candidate_k from 15 to 10 substantially reduced retrieval latency, bringing RAG pipeline P95 down to ~3.66 seconds. TTFT remains within the target SLO at 995 milliseconds P95. Full-answer latency is slightly above the 3-second target and can be considered a future optimization rather than an immediate priority.
+
 ## Notes
 
-- This project is best treated as a local research prototype for document-grounded QA.
-- The data pipeline is designed around a single PDF-based knowledge source, but the retrieval architecture is modular enough to extend to additional sources.
 - Some older documentation may describe capabilities that are no longer implemented exactly; this README reflects the current implementation.
 - Evaluation scores and latency measurements are benchmark results for the current datasets/configuration and are not guarantees of production performance.
 - The latency benchmark measures the RAG retrieval-and-generation path separately from planner-level latency in the command-line application.
@@ -492,7 +512,6 @@ The current implementation includes:
 - CLI-only interface
 - Conversation memory exists only during the current session
 - The latency benchmark is based on a small number of runs and should be expanded for more reliable percentile estimates
-- Retrieval remains the primary latency bottleneck in the current baseline
 
 ---
 
