@@ -440,20 +440,19 @@ The latest baseline indicates that retrieval is the primary latency bottleneck, 
 
 ### Improved Latency
 
-=================================================================================================
-LATENCY (milliseconds)
-=================================================================================================
-
 ---
 
 end-to-end | mean= 3292.5 p50= 3372.8 p95= 3668.1 p99= 3822.8 min= 2878.3 max= 3861.4
+
 ttft | mean= 923.9 p50= 917.7 p95= 995.0 p99= 1001.0 min= 866.6 max= 1002.6
+
 retrieval | mean= 2227.1 p50= 2158.6 p95= 2618.6 p99= 2777.8 min= 1953.8 max= 2817.6
+
 generation | mean= 1065.3 p50= 1056.2 p95= 1236.8 p99= 1281.9 min= 883.4 max= 1293.2
 
 ---
 
-# avg answer length: 540 chars (latency varies with output length)
+avg answer length: 540 chars (latency varies with output length)
 
 SLO: full answer p95 <= 3000 ms -> p95 = 3668 ms [FAIL]
 SLO: first token (perceived) p95 <= 1200 ms -> p95 = 995 ms [PASS]
