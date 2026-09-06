@@ -455,6 +455,7 @@ generation | mean= 1065.3 p50= 1056.2 p95= 1236.8 p99= 1281.9 min= 883.4 max= 12
 avg answer length: 540 chars (latency varies with output length)
 
 SLO: full answer p95 <= 3000 ms -> p95 = 3668 ms [FAIL]
+
 SLO: first token (perceived) p95 <= 1200 ms -> p95 = 995 ms [PASS]
 
 Reducing candidate_k from 15 to 10 substantially reduced retrieval latency, bringing RAG pipeline P95 down to ~3.66 seconds. TTFT remains within the target SLO at 995 milliseconds P95. Full-answer latency is slightly above the 3-second target and can be considered a future optimization rather than an immediate priority.
