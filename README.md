@@ -128,12 +128,12 @@ Rag/
 │   ├── scope_results.json
 │   ├── toxicity_results.json
 │   ├── prompt_v1/
-│   │   ├── generator_results.json
 │   │   └── pipeline_results.json
 │   └── prompt_v2/
 │       └── pipeline_results.json
-|       ├── generator_results.json
-│
+│       prompt_v3/
+│       └── pipeline_results.json
+|
 ├── test_cases/
 │   ├── generator_evalset.json
 │   ├── pipeline_eval.json
@@ -331,17 +331,24 @@ The following results were obtained from the saved evaluation runs and represent
 
 The evaluation threshold was **0.70**.
 
-### Retriever
+### Retriever(Without Reranker)
 
-- Contextual Precision: **0.664**
-- Contextual Recall: **0.892**
+- Contextual Precision: **0.736**
+- Contextual Recall: **0.858**
+
+### Retriever(With Reranker)
+
+- Contextual Precision: **0.775**
+- Contextual Recall: **0.816**
+
+Reranking improved Contextual Precision (0.736 → 0.775) but reduced Contextual Recall (0.858 → 0.816) — the classic cross-encoder reranking trade-off: narrowing to the most relevant top-k chunks improves ranking quality at some cost to overall coverage. "With Reranker" reflects the current production configuration. Both configurations now pass the 0.70 threshold; an earlier baseline measurement of Contextual Precision (0.664, below threshold) was taken before chunking fixes — removing index/glossary pages and citation-list blocks that were polluting the retrieved context — and no longer reflects the current implementation.
 
 ### Safety
 
 - Scope adherence: **0.910**
 - Toxicity: **0.000**
 
-### Generator — prompt_v1
+### Generator
 
 - Answer Relevancy: **0.983**
 - Faithfulness: **1.000**
@@ -353,9 +360,29 @@ The evaluation threshold was **0.70**.
 - Correctness: **0.850**
 - Completeness: **0.765**
 
-The baseline evaluation shows particularly strong faithfulness and toxicity results. The main weaknesses are retrieval precision and answer completeness on harder or more ambiguous questions.
+### RAG pipeline — prompt_v2
 
----
+- Answer Relevancy: **0.753**
+- Faithfulness: **1.000**
+- Correctness: **0.755**
+- Completeness: **0.720**
+
+### RAG pipeline — prompt_v3
+
+- Answer Relevancy: **0.911**
+- Faithfulness: **1.000**
+- Correctness: **0.850**
+- Completeness: **0.805**
+
+**Prompt ablation:** Prompt V2 added explicit instructions for multi-part question coverage, relevance control, unsupported-inference prevention, scope handling, safety, and prompt-injection resistance. On the same 20-question evaluation set, V2 reduced Answer Relevancy (0.875 → 0.753), Correctness (0.850 → 0.755), and Completeness (0.765 → 0.720), while Faithfulness stayed unchanged at 1.0. The likely cause was a single instruction telling the model not to add unrelated information or repeat itself — a brevity constraint that plausibly also licensed trimming content it should have kept.
+
+Prompt V3 tested this directly: every V2 rule was kept unchanged except that one instruction, reworded to include all relevant context detail even at greater length, only omitting genuinely unrelated information or exact restatement. V3 recovered fully and exceeded the V1 baseline: Answer Relevancy 0.911, Correctness 0.850, Completeness 0.805, Faithfulness unchanged at 1.0. This confirms the regression was caused by that specific instruction rather than by the added safety and scope constraints as a whole, and V3 is retained as the current baseline prompt, combining V2's safety/scope properties with quality that matches or exceeds V1.
+
+Two questions in the V3 run (Gaussian mixture model responsibilities during EM; why soft voting weights confident classifiers more than hard voting) scored 0.0 on Answer Relevancy, Correctness, and Completeness while Faithfulness remained 1.0 — indicating an honest refusal rather than a hallucination, caused by the retriever failing to surface relevant content rather than a generation-quality issue. Excluding these two retrieval-gap cases, the remaining 18 questions average 0.956 / 1.000 / 0.944 / 0.894. The Gaussian mixture model gap has now appeared independently across two separate evaluation sets, suggesting a persistent retrieval issue for that specific topic rather than a one-off miss; investigating this is a planned next step, separate from prompt tuning.
+
+The baseline evaluation shows particularly strong faithfulness and toxicity results, and retrieval precision now passes threshold following chunking fixes made since the initial baseline. The remaining weaknesses are Contextual Recall under reranking, a specific, reproducible retrieval gap on Gaussian mixture model content, and answer completeness on harder or more ambiguous questions — the latter substantially improved by prompt V3.
+
+````
 
 ## Latency Profiling
 
@@ -365,7 +392,7 @@ Run it with:
 
 ```bash
 python -m evals.eval_latency
-```
+````
 
 ### Baseline latency results
 

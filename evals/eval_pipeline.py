@@ -121,7 +121,7 @@ def evaluate_rag(
 
 
 RESULTS_FILE = Path(
-    "/mnt/sdb1/Programming/DS_Projects/Rag/results/prompt_v2/pipeline_results.json"
+    "/mnt/sdb1/Programming/DS_Projects/Rag/results/prompt_v3/pipeline_results.json"
 )
 
 
@@ -158,7 +158,7 @@ def save_result(question_id: int, query: str, results):
         json.dump(all_results, f, indent=4)
 
 
-for question in pipeline_evalset[:2]:
+for question in pipeline_evalset[19:20]:
 
     query = question["query"]
     expected_output = question["reference_answer"]
