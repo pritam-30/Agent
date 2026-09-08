@@ -2,7 +2,7 @@
 
 This repository contains a local Retrieval-Augmented Generation (RAG) assistant for answering questions over a document knowledge base. The current implementation uses Gemini models for query rewriting and grounded answer generation, ChromaDB for vector storage, BM25 for lexical retrieval, and a cross-encoder reranker to improve the final context passed to the generator.
 
-The code is structured as a research / prototype pipeline rather than a production chat app. It includes a command-line agent loop, document ingestion utilities, retrieval strategies, and evaluation scripts for retrieval, generation, latency, and scope adherence.
+The code is structured as a research / prototype pipeline rather than a production application. It includes a web interface and REST API, a document ingestion pipeline, multiple retrieval strategies, reranking, conversational state management, and evaluation scripts for retrieval, generation, latency, and scope adherence.
 
 ---
 
@@ -509,7 +509,6 @@ The current implementation includes:
 
 ## Current Limitations
 
-- CLI-only interface
 - Conversation memory exists only during the current session
 - The latency benchmark is based on a small number of runs and should be expanded for more reliable percentile estimates
 
@@ -519,8 +518,6 @@ The current implementation includes:
 
 Potential future enhancements include:
 
-- REST API
-- Web interface
 - Docker support
 - Long-term conversational memory
 - Further retrieval and reranking latency optimization
@@ -530,6 +527,7 @@ Potential future enhancements include:
 ## Tech Stack
 
 - Python
+- FastAPI
 - Google Gemini
 - ChromaDB
 - Sentence Transformers
