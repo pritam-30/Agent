@@ -70,8 +70,8 @@ bm25 = BM25Okapi(bm25_tokenized_documents)
 
 def similarity_search(
     query: str,
-    k: int = 3,
-    candidate_k: int = 15,
+    k: int = 5,
+    candidate_k: int = 10,
     rerank: bool = True,
 ):
     """
@@ -113,7 +113,7 @@ def similarity_search(
 
 def mmr_search(
     query: str,
-    k: int = 3,
+    k: int = 5,
     fetch_k: int = 10,
     lambda_mult: float = 0.5,
     rerank: bool = True,
@@ -153,7 +153,7 @@ def mmr_search(
 
 def bm25_search(
     query: str,
-    k: int = 15,
+    k: int = 10,
 ):
     """
     BM25 lexical retrieval over the entire knowledge base.
@@ -246,8 +246,8 @@ def reciprocal_rank_fusion(
 
 def hybrid_search(
     query: str,
-    k: int = 3,
-    candidate_k: int = 15,
+    k: int = 5,
+    candidate_k: int = 10,
     rrf_k: int = 60,
     rerank: bool = True,
 ):

@@ -14,8 +14,7 @@ RETRIEVAL_METHOD = os.getenv(
 
 
 def retrieve(
-    query: str,
-    k: int = 3,
+    query: str
 ):
     """
     Dispatch retrieval to the selected strategy.
@@ -25,8 +24,7 @@ def retrieve(
         query = rewrite_query(query)
         print(f"Rewritten query: {query}")
         documents, metadatas = similarity_search(
-            query=query,
-            k=k,
+            query=query
         )
         return documents, metadatas
 
@@ -35,14 +33,13 @@ def retrieve(
         print(f"Rewritten query: {query}")
         documents, metadatas = mmr_search(
             query=query,
-            k=k,
         )
         return documents, metadatas
 
     elif RETRIEVAL_METHOD == "hybrid":
         query = rewrite_query(query)
         print(f"Rewritten query: {query}")
-        documents, metadatas = hybrid_search(query=query, k=k)
+        documents, metadatas = hybrid_search(query=query)
         return documents, metadatas
 
     else:

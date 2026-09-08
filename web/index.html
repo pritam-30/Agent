@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>Book RAG Assistant</title>
+
+    <link rel="stylesheet" href="/web/style.css" />
+
+    <!-- Markdown renderer -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  </head>
+
+  <body>
+    <div class="app">
+      <!-- ========================================= -->
+      <!-- Header -->
+      <!-- ========================================= -->
+
+      <header class="header">
+        <div class="header-title">
+          <div class="book-icon">📚</div>
+
+          <div>
+            <h1>Book RAG Assistant</h1>
+
+            <p>Ask questions about Hands-On Machine Learning</p>
+          </div>
+        </div>
+
+        <button id="new-chat-button" class="new-chat-button">+ New Chat</button>
+      </header>
+
+      <!-- ========================================= -->
+      <!-- Chat -->
+      <!-- ========================================= -->
+
+      <main id="chat-container" class="chat-container">
+        <div id="welcome-message" class="welcome-message">
+          <div class="welcome-icon">📖</div>
+
+          <h2>Ask me about the book</h2>
+
+          <p>I can answer questions using the indexed book content.</p>
+
+          <div class="example-questions">
+            <button class="example-question">What is overfitting?</button>
+
+            <button class="example-question">
+              What is the bias-variance tradeoff?
+            </button>
+
+            <button class="example-question">Explain gradient descent.</button>
+          </div>
+        </div>
+      </main>
+
+      <!-- ========================================= -->
+      <!-- Input -->
+      <!-- ========================================= -->
+
+      <form id="chat-form" class="input-area">
+        <textarea
+          id="message-input"
+          placeholder="Ask a question about the book..."
+          rows="1"
+          required
+        ></textarea>
+
+        <button type="submit" id="send-button" class="send-button">Send</button>
+      </form>
+
+      <div class="footer">Local RAG · Book-grounded answers</div>
+    </div>
+
+    <script src="/web/app.js"></script>
+  </body>
+</html>
